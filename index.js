@@ -1,9 +1,7 @@
-
 require('dotenv').config();
 const {
   Client,
   GatewayIntentBits,
-  InteractionType,
   EmbedBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -11,7 +9,9 @@ const {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder
 } = require('discord.js');
+
 const { DisTube } = require('distube');
+const { YtDlpPlugin } = require('@distube/yt-dlp');
 
 const client = new Client({
   intents: [
@@ -22,8 +22,7 @@ const client = new Client({
 
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
-  searchSongs: 5,
-  searchCooldown: 30
+  plugins: [new YtDlpPlugin()]
 });
 
 client.on('ready', () => {
@@ -33,112 +32,112 @@ client.on('ready', () => {
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  const { commandName, options, member, guild } = interaction;
+  const { commandName, options, member } = interaction;
+  const voiceChannel = member.voice?.channel;
 
-  const voiceChannel = member.voice.channel;
-  if (!voiceChannel && commandName !== 'help') {
+  if (!voiceChannel && commandName !== 'help' && commandName !== 'buscar') {
     return interaction.reply({ content: '❌ Debes estar en un canal de voz.', ephemeral: true });
   }
 
   try {
-    switch (commandName) {
-      case 'play': {
-        const query = options.getString('cancion');
-        await distube.play(voiceChannel, query, {
-          textChannel: interaction.channel,
-          member: interaction.member
-        });
-        await interaction.reply(`🎶 Reproduciendo: \`${query}\``);
-        break;
+    if (commandName === 'play') {
+      const query = options.getString('cancion');
+      await interaction.deferReply();
+      await distube.play(voiceChannel, query, {
+        textChannel: interaction.channel,
+        member: interaction.member
+      });
+      return interaction.editReply(`🎶 Reproduciendo: \`${query}\``);
+    }
+
+    if (commandName === 'pause') {
+      await interaction.reply('⏸️ Música pausada.');
+      return distube.pause(interaction);
+    }
+
+    if (commandName === 'resume') {
+      await interaction.reply('▶️ Música reanudada.');
+      return distube.resume(interaction);
+    }
+
+    if (commandName === 'stop') {
+      await interaction.reply('⏹️ Reproducción detenida.');
+      return distube.stop(interaction);
+    }
+
+    if (commandName === 'skip') {
+      await interaction.reply('⏭️ Canción saltada.');
+      return distube.skip(interaction);
+    }
+
+    if (commandName === 'volumen') {
+      const vol = options.getInteger('nivel');
+      if (vol < 1 || vol > 100)
+        return interaction.reply('🔊 Usa un número entre 1 y 100.');
+      distube.setVolume(interaction, vol);
+      return interaction.reply(`🔊 Volumen establecido al ${vol}%`);
+    }
+
+    if (commandName === 'buscar') {
+      const query = options.getString('consulta');
+      const results = await distube.search(query);
+      if (!results || results.length === 0) {
+        return interaction.reply({ content: '❌ No se encontraron resultados.', ephemeral: true });
       }
 
-      case 'pause':
-        distube.pause(interaction);
-        await interaction.reply('⏸️ Música pausada.');
-        break;
+      const optionsMenu = results.slice(0, 5).map((song, i) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`${i + 1}. ${song.name}`)
+          .setDescription(song.formattedDuration)
+          .setValue(song.url)
+      );
 
-      case 'resume':
-        distube.resume(interaction);
-        await interaction.reply('▶️ Música reanudada.');
-        break;
+      const row = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('search_select')
+          .setPlaceholder('Selecciona una canción...')
+          .addOptions(optionsMenu)
+      );
 
-      case 'stop':
-        distube.stop(interaction);
-        await interaction.reply('⏹️ Reproducción detenida.');
-        break;
+      return interaction.reply({
+        content: '🎧 Resultados de búsqueda:',
+        components: [row]
+      });
+    }
 
-      case 'skip':
-        distube.skip(interaction);
-        await interaction.reply('⏭️ Canción saltada.');
-        break;
+    if (commandName === 'queue') {
+      const queue = distube.getQueue(interaction);
+      if (!queue) return interaction.reply('📭 No hay canciones en la cola.');
 
-      case 'volumen': {
-        const vol = options.getInteger('nivel');
-        if (vol < 1 || vol > 100)
-          return interaction.reply('🔊 Usa un número entre 1 y 100.');
-        distube.setVolume(interaction, vol);
-        await interaction.reply(`🔊 Volumen establecido al ${vol}%`);
-        break;
-      }
+      const embed = new EmbedBuilder()
+        .setColor('Blurple')
+        .setTitle('🎶 Cola de reproducción')
+        .setDescription(
+          queue.songs
+            .map((s, i) => `${i === 0 ? '🔊 **' : `${i + 1}. `}${s.name}** \`(${s.formattedDuration})\``)
+            .join('\n')
+        )
+        .setTimestamp();
 
-      case 'buscar': {
-        const query = options.getString('consulta');
-        const results = await distube.search(query);
-        const optionsMenu = results.slice(0, 5).map((song, i) =>
-          new StringSelectMenuOptionBuilder()
-            .setLabel(`${i + 1}. ${song.name}`)
-            .setDescription(song.formattedDuration)
-            .setValue(song.url)
-        );
+      return interaction.reply({ embeds: [embed] });
+    }
 
-        const row = new ActionRowBuilder().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId('search_select')
-            .setPlaceholder('Selecciona una canción...')
-            .addOptions(optionsMenu)
-        );
+    if (commandName === 'panel') {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('pause').setLabel('⏸️ Pausar').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('resume').setLabel('▶️ Reanudar').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('skip').setLabel('⏭️ Saltar').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('stop').setLabel('⏹️ Detener').setStyle(ButtonStyle.Danger)
+      );
 
-        await interaction.reply({
-          content: '🎧 Resultados de búsqueda:',
-          components: [row]
-        });
-        break;
-      }
+      return interaction.reply({
+        content: '🎛️ Controles de reproducción:',
+        components: [row]
+      });
+    }
 
-      case 'queue': {
-        const queue = distube.getQueue(interaction);
-        if (!queue) return interaction.reply('📭 No hay canciones en la cola.');
-
-        const embed = new EmbedBuilder()
-          .setColor('Blurple')
-          .setTitle('🎶 Cola de reproducción')
-          .setDescription(
-            queue.songs
-              .map((s, i) => `${i === 0 ? '🔊 **' : `${i + 1}. `}${s.name}** \`(${s.formattedDuration})\``)
-              .join('\n')
-          )
-          .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
-        break;
-      }
-
-      case 'panel': {
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('pause').setLabel('⏸️ Pausar').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('resume').setLabel('▶️ Reanudar').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('skip').setLabel('⏭️ Saltar').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId('stop').setLabel('⏹️ Detener').setStyle(ButtonStyle.Danger)
-        );
-        await interaction.reply({
-          content: '🎛️ Controles de reproducción:',
-          components: [row]
-        });
-        break;
-      }
-
-      case 'help': {
-        await interaction.reply(`📚 **Comandos disponibles:**\n
+    if (commandName === 'help') {
+      return interaction.reply(`📚 **Comandos disponibles:**\n
 /play [canción]\n
 /pause | /resume | /stop | /skip\n
 /volumen [1-100]\n
@@ -146,34 +145,36 @@ client.on('interactionCreate', async (interaction) => {
 /queue\n
 /panel\n
 /help`);
-        break;
-      }
-
-      default:
-        await interaction.reply('❌ Comando no reconocido.');
     }
+
   } catch (err) {
     console.error(err);
-    await interaction.reply({ content: '❌ Hubo un error al ejecutar el comando.', ephemeral: true });
+    return interaction.reply({ content: '❌ Hubo un error al ejecutar el comando.', ephemeral: true });
   }
 });
 
 client.on('interactionCreate', async interaction => {
   if (interaction.isStringSelectMenu() && interaction.customId === 'search_select') {
-    const voiceChannel = interaction.member.voice.channel;
+    const voiceChannel = interaction.member.voice?.channel;
     if (!voiceChannel) {
       return interaction.reply({ content: '❌ Debes estar en un canal de voz.', ephemeral: true });
     }
+
     const url = interaction.values[0];
+    await interaction.deferReply();
     await distube.play(voiceChannel, url, {
       textChannel: interaction.channel,
       member: interaction.member
     });
-    await interaction.reply(`🎶 Reproduciendo: ${url}`);
+    return interaction.editReply(`🎶 Reproduciendo: ${url}`);
   }
 
   if (interaction.isButton()) {
     const action = interaction.customId;
+    if (!interaction.member.voice?.channel) {
+      return interaction.reply({ content: '❌ Debes estar en un canal de voz.', ephemeral: true });
+    }
+
     switch (action) {
       case 'pause':
         distube.pause(interaction);
