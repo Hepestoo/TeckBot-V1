@@ -12,7 +12,6 @@ const client = new Client({
 });
 
 const distube = new DisTube(client, {
-  leaveOnEmpty: true,
   emitNewSongOnly: true
 });
 
