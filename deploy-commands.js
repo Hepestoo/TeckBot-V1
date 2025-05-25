@@ -1,74 +1,42 @@
+// deploy-commands.js
 require('dotenv').config();
 const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const commands = [
   new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Reproduce una canción por nombre o link')
+    .setDescription('Reproduce una canción por nombre o URL.')
     .addStringOption(option =>
-      option.setName('cancion')
-        .setDescription('Nombre o enlace de la canción')
-        .setRequired(true)),
-
+      option.setName('cancion').setDescription('Nombre o URL de la canción').setRequired(true)),
   new SlashCommandBuilder()
-    .setName('pause')
-    .setDescription('Pausa la reproducción actual'),
-
+    .setName('add')
+    .setDescription('Agrega una canción a la cola sin interrumpir.')
+    .addStringOption(option =>
+      option.setName('cancion').setDescription('Nombre o URL de la canción').setRequired(true)),
+  new SlashCommandBuilder().setName('pause').setDescription('Pausa la canción actual.'),
+  new SlashCommandBuilder().setName('resume').setDescription('Reanuda la canción pausada.'),
+  new SlashCommandBuilder().setName('skip').setDescription('Salta la canción actual.'),
+  new SlashCommandBuilder().setName('stop').setDescription('Detiene y limpia la cola.'),
+  new SlashCommandBuilder().setName('queue').setDescription('Muestra la cola de reproducción.'),
   new SlashCommandBuilder()
-    .setName('resume')
-    .setDescription('Reanuda la canción pausada'),
-
-  new SlashCommandBuilder()
-    .setName('stop')
-    .setDescription('Detiene la música y limpia la cola'),
-
-  new SlashCommandBuilder()
-    .setName('skip')
-    .setDescription('Salta la canción actual'),
-
-  new SlashCommandBuilder()
-    .setName('volumen')
-    .setDescription('Cambia el volumen de la música')
+    .setName('volume')
+    .setDescription('Cambia el volumen.')
     .addIntegerOption(option =>
-      option.setName('nivel')
-        .setDescription('Volumen entre 1 y 100')
-        .setRequired(true)),
-
-  new SlashCommandBuilder()
-    .setName('buscar')
-    .setDescription('Busca canciones para elegir')
-    .addStringOption(option =>
-      option.setName('consulta')
-        .setDescription('Nombre de la canción')
-        .setRequired(true)),
-
-  new SlashCommandBuilder()
-    .setName('queue')
-    .setDescription('Muestra la cola de canciones'),
-
-  new SlashCommandBuilder()
-    .setName('panel')
-    .setDescription('Muestra botones de control de música'),
-
-  new SlashCommandBuilder()
-    .setName('help')
-    .setDescription('Muestra los comandos disponibles')
+      option.setName('percent').setDescription('Porcentaje (1-100)').setRequired(true)),
+  new SlashCommandBuilder().setName('nowplaying').setDescription('Muestra la canción actual.')
 ].map(command => command.toJSON());
 
-// Usa tu CLIENT_ID y GUILD_ID
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
   try {
-    console.log('🚀 Registrando comandos...');
-
+    console.log('⌛ Registrando comandos...');
     await rest.put(
       Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commands }
+      { body: commands },
     );
-
-    console.log('✅ Comandos registrados exitosamente');
+    console.log('✅ Slash commands registrados');
   } catch (error) {
-    console.error('❌ Error al registrar los comandos:', error);
+    console.error('❌ Error al registrar comandos:', error);
   }
 })();
