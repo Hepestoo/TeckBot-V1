@@ -128,19 +128,23 @@ client.on(Events.InteractionCreate, async interaction => {
           textChannel: interaction.channel,
           skip: false
         });
-        await interaction.editReply({ content: '✅ Canción añadida a la cola.' });
+        await interaction.deleteReply();
       } else if (commandName === 'pause') {
         distube.pause(interaction);
-        await interaction.reply('⏸ Música pausada.');
+        await interaction.deferReply({ flags: 64 });
+        await interaction.deleteReply();
       } else if (commandName === 'resume') {
         distube.resume(interaction);
-        await interaction.reply('▶ Música reanudada.');
+        await interaction.deferReply({ flags: 64 });
+        await interaction.deleteReply();
       } else if (commandName === 'skip') {
         distube.skip(interaction);
-        await interaction.reply('⏭ Canción saltada.');
+        await interaction.deferReply({ flags: 64 });
+        await interaction.deleteReply();
       } else if (commandName === 'stop') {
         distube.stop(interaction);
-        await interaction.reply('⏹ Música detenida.');
+        await interaction.deferReply({ flags: 64 });
+        await interaction.deleteReply();
       } else if (commandName === 'queue') {
         if (!queue || !queue.songs.length) {
           return interaction.reply('❌ No hay canciones en la cola.');
@@ -200,26 +204,24 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     try {
+      await interaction.deferReply({ flags: 64 });
       switch (interaction.customId) {
         case 'pause':
           distube.pause(interaction);
-          await interaction.reply({ content: '⏸ Música pausada.', flags: 64 });
           break;
         case 'resume':
           distube.resume(interaction);
-          await interaction.reply({ content: '▶ Música reanudada.', flags: 64 });
           break;
         case 'skip':
           distube.skip(interaction);
-          await interaction.reply({ content: '⏭ Canción saltada.', flags: 64 });
           break;
         case 'stop':
           distube.stop(interaction);
-          await interaction.reply({ content: '⏹ Música detenida.', flags: 64 });
           break;
         default:
-          await interaction.reply({ content: '❌ Acción no reconocida.', flags: 64 });
+          break;
       }
+      await interaction.deleteReply();
     } catch (err) {
       console.error('❌ Error al manejar botón:', err);
       if (!interaction.replied && !interaction.deferred) {
